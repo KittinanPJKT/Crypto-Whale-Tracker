@@ -1,0 +1,12 @@
+# Tools 
+.DS_Store
+.env
+
+# Frontend Dependencies 
+frontend/node_modules/
+frontend/dist/
+
+# Backend Binaries 
+backend/bin/
+backend/*.exe
+backend/*.out
