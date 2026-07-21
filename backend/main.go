@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/websocket"
 	"strconv"
 	"encoding/json"
+	"net/http"
 )
 
 type Trade struct {
@@ -12,7 +13,28 @@ type Trade struct {
 	Quantity	string	`json:"q"`
 }
 
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan Trade)
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
 func main() {
+
+	go handleMessages()
+
+	http.HandleFunc("/ws", handleConnections)
+
+	go func() {
+		log.Println("เปิดสถานีส่งสัญญาณที่พอร์ต : 9090")
+		err := http.ListenAndServe(":9090", nil)
+		if err != nil {
+			log.Fatal("ไม่สามารถเปิดเซิร์ฟเวอร์ได้ : ", err)
+		}
+	}()
 	url := "wss://stream.binance.com/ws/btcusdt@trade"
 	log.Printf("กำลังทำการเชื่อมต่อ %s...", url)
 
@@ -44,11 +66,48 @@ func main() {
 
 		value := price * quantity
 
-		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงาน
-		if value < 50000 {
-			continue
+		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
+		if value > 1000 {
+			log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)	
+			broadcast <- trade
 		}
 
-		log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)
+		
+	}
+}
+
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("อัปเกรดเป็น Websocket ไม่สำเร็จ : %v", err)
+		return
+	}
+	defer ws.Close()
+
+	clients[ws] = true
+	log.Println("มีหน้าจอ React เชื่อมต่อเข้ามาใหม่")
+
+	for {
+		_, _, err := ws.ReadMessage()
+		if err != nil {
+			log.Println("หน้อจอ React ตัดการเชื่อมต่อ")
+			delete(clients, ws)
+			break
+		}
+	}
+}
+
+func handleMessages() {
+	for {
+		whale := <-broadcast
+
+		for client := range clients {
+			err := client.WriteJSON(whale)
+			if err != nil {
+				log.Printf("ส่งข้อมูลล้มเหลว: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
 	}
 }
