@@ -6,6 +6,9 @@ import (
 	"strconv"
 	"encoding/json"
 	"net/http"
+
+	"database/sql"
+	_ "github.com/lib/pq"
 )
 
 type Trade struct {
@@ -13,16 +16,53 @@ type Trade struct {
 	Quantity	string	`json:"q"`
 }
 
-var clients = make(map[*websocket.Conn]bool)
-var broadcast = make(chan Trade)
-
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan Trade)
+var db *sql.DB
+
+func initDB() {
+	var err error
+
+	connStr := "postgres://root:password@localhost:5432/whale_tracker?sslmode=disable"
+
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("เกิดปัญหาในการเปิดฐานข้อมูล: %v", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("ไม่สามารถเชื่อมฐานข้อมูลได้: %v", err)
+	}
+
+	log.Println("เชื่อมต่อฐานข้อมูล PostgreSQL สำเร็จ")
+
+	createTableQuery := `
+	CREATE TABLE IF NOT EXISTS whales (
+			id SERIAL PRIMARY KEY,
+			price NUMERIC(10, 2),
+			quantity NUMERIC(10, 4),
+			value NUMERIC(15, 2),
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	_, err = db.Exec(createTableQuery)
+	if err != nil {
+		log.Fatalf("สร้างตารางไม่สำเร็จ: %v", err)
+	}
+
+	log.Println("ตรสจสอบและสร้างตาราง 'whales' เรียบร้อย")
+}
+
 
 func main() {
+
+	initDB()
 
 	go handleMessages()
 
