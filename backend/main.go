@@ -107,9 +107,17 @@ func main() {
 		value := price * quantity
 
 		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
-		if value > 1000 {
+		if value > 5000 {
 			log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)	
 			broadcast <- trade
+
+			insertQuery := `INSERT INTO whales (price, quantity, value) VALUES ($1, $2, $3)`
+			_, err = db.Exec(insertQuery, price, quantity, value)
+			if err != nil {
+				log.Printf("บันทึกข้อมูล DB ไม่สำเร็จ : %v", err)
+			} else {
+				log.Println("บันทึกลงฐานข้อมูลเรียบร้อย")
+			}
 		}
 
 		
