@@ -16,6 +16,14 @@ type Trade struct {
 	Quantity	string	`json:"q"`
 }
 
+type WhaleRecord struct {
+	ID			int			`json:"id"`
+	Price	 	float64 	`json:"price"`
+	Quantity	float64 	`json:"quantity"`
+	Value 		float64 	`json:"value"`
+	CreatedAt 	string 		`json:"created_at"`
+}
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -67,6 +75,7 @@ func main() {
 	go handleMessages()
 
 	http.HandleFunc("/ws", handleConnections)
+	http.HandleFunc("/api/whales", getWhalesHistory)
 
 	go func() {
 		log.Println("เปิดสถานีส่งสัญญาณที่พอร์ต : 9090")
@@ -158,4 +167,29 @@ func handleMessages() {
 			}
 		}
 	}
+}
+
+func getWhalesHistory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-type", "application/json")
+
+	rows, err := db.Query("SELECT id, price, quantity, value, created_at FROM whales ORDER BY id DESC LIMIT 50")
+	if err != nil {
+		http.Error(w, "Query failed", http.StatusInternalServerError)
+		log.Printf("ดึงประวัติข้อมูลล้มเหลว: %v",err)
+		return
+	}
+	defer rows.Close()
+
+	var whales []WhaleRecord
+	for rows.Next() {
+		var record WhaleRecord
+		if err := rows.Scan(&record.ID, &record.Price, &record.Quantity, &record.Value, &record.CreatedAt); err != nil {
+			log.Printf("แปลงข้อมูลล้มเหลว %v", err)
+			continue
+		}
+		whales = append(whales, record)
+	}
+
+	json.NewEncoder(w).Encode(whales)
 }
