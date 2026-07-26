@@ -4,6 +4,20 @@ function App() {
   const [whales, setWhales] = useState([])
 
   useEffect(() => {
+
+    fetch('http://localhost:9090/api/whales')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.length > 0) {
+          const historyWhales = data.map((record) => ({
+            p: record.price.toString(),
+            q: record.quantity.toString(),
+            isHistory: true
+          }))
+          setWhales(historyWhales)
+        }
+      })
+      .catch((err) => console.error('ดึงประวัติล้มเหลว : ', err))
     
     const ws = new WebSocket('ws://localhost:9090/ws')
 
@@ -13,9 +27,9 @@ function App() {
 
     ws.onmessage = (event) => {
       const trade = JSON.parse(event.data)
-      console.log("Whale Alert : ", trade)
-
-      setWhales((prevWhales) => [trade, ...prevWhales].slice(0, 10))
+      //console.log("Whale Alert : ", trade)
+      trade.isHistory = false
+      setWhales((prevWhales) => [trade, ...prevWhales].slice(0, 50))
     }
 
     return () => {
@@ -52,7 +66,11 @@ function App() {
           return (
             <div
               key={index}
-              className="bg-slate-800 p-4 rounded-lg border-l-4 border-emerald-500 flex justify-between items-center shadow-lg"
+              className={`p-4 rounded-lg flex justify-between items-center shadow-lg border-l-4 transition-all duration-500 ${
+                whale.isHistory
+                  ? 'bg-slate-800/60 border-slate-600'
+                  : 'bg-slate-800 border-emerald-500'
+              }`}
             >
               <div>
                 <p className='font-mono text-xl font-bold text-white'>
