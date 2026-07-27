@@ -1,4 +1,4 @@
-version: '3.8'
+#version: '3.8'
 
 services:
   db:
@@ -13,6 +13,29 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+# Go backend
+  backend:
+    build: ./backend
+    container_name: whale_backend
+    restart: always
+    ports:
+      - "9090:9090"
+    depends_on:
+      - db
+    environment:
+      - DB_URL=postgres://root:password@db:5432/whale_tracker?sslmode=disable
+
+# React frontend
+  frontend:
+    build: ./frontend
+    container_name: whale_frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
 
 volumes:
   pgdata:

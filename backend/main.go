@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"database/sql"
 	_ "github.com/lib/pq"
@@ -36,7 +37,11 @@ var db *sql.DB
 func initDB() {
 	var err error
 
-	connStr := "postgres://root:password@localhost:5432/whale_tracker?sslmode=disable"
+	connStr := os.Getenv("DB_URL")
+
+	if connStr == "" {
+		connStr = "postgres://root:password@localhost:5432/whale_tracker?sslmode=disable"
+	}
 
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
