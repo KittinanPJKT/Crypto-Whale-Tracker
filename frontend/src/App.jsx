@@ -2,9 +2,16 @@ import { useState, useEffect } from 'react'
 
 function App() {
   const [whales, setWhales] = useState([])
-  const totalWhales = whales.length;
-  const totalVolume = whales.reduce((sum, whale) => sum + (parseFloat(whale.p) * parseFloat(whale.q)), 0);
+  const [minVolume, setMinVolume] = useState(0);
 
+  const filteredWhales = whales.filter((whale) => {
+    const value = parseFloat(whale.p) * parseFloat(whale.q);
+    return value >= minVolume;
+  });
+
+  const totalWhales = filteredWhales.length;
+  const totalVolume = filteredWhales.reduce((sum, whale) => sum + (parseFloat(whale.p) * parseFloat(whale.q)), 0);
+  
   useEffect(() => {
     fetch('http://localhost:9090/api/whales')
       .then((res) => res.json())
@@ -69,12 +76,25 @@ function App() {
         </div>
       </div>
 
+      {/*2.5 Filter Section */}
+      <div className="mb-6 flex items-center justify-end gap-3">
+        <label className="text-slate-400 text-sm font-medium">Min Volume ($):</label>
+        <input 
+          type="number"
+          value={minVolume}
+          onChange={(e) => setMinVolume(Number(e.target.value))}
+          className="bg-slate-800 border border-slate-700 text-emerald-400 font-mono text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 w-32 shadow-sm"
+          placeholder="0"
+          min="0"
+          />
+      </div>
+
       {/* 3. Data Feed Section */}
       <div className="space-y-4">
-        {whales.length === 0 ? (
+        {filteredWhales.length === 0 ? (
           <p className="text-slate-500 italic text-center py-8">Waiting for whale signals...</p>
         ) : (
-          whales.map((whale, index) => {
+          filteredWhales.map((whale, index) => {
             const price = parseFloat(whale.p)
             const qty = parseFloat(whale.q)
             const value = price * qty
