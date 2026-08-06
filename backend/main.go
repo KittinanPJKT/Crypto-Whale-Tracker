@@ -10,6 +10,9 @@ import (
 
 	"database/sql"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Trade struct {
@@ -30,6 +33,14 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+var (
+    whalesCaughtTotal = promauto.NewCounter(prometheus.CounterOpts{
+        Name: "whale_tracker_caught_total",
+        Help: "The total number of whales caught by the tracker",
+    })
+)
+
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan Trade)
 var db *sql.DB
@@ -74,6 +85,8 @@ func initDB() {
 
 
 func main() {
+
+	http.Handle("/metrics", promhttp.Handler())
 
 	initDB()
 
@@ -121,7 +134,7 @@ func main() {
 		value := price * quantity
 
 		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
-		if value > 5000 {
+		if value > 100000 {
 			log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)	
 			broadcast <- trade
 
@@ -133,6 +146,9 @@ func main() {
 				log.Println("บันทึกลงฐานข้อมูลเรียบร้อย")
 			}
 		}
+
+		log.Println("Go Backend started on :9090")
+    	http.ListenAndServe(":9090", nil)
 
 		
 	}
