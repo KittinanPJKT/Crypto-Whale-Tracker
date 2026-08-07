@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s # ตั้งให้ดูดข้อมูลทุกๆ 5 วินาที
+
+scrape_configs:
+  - job_name: 'whale-tracker-backend'
+    static_configs:
+      # ใช้ชื่อ service 'backend' ตามที่ตั้งไว้ใน docker-compose และพอร์ต 9090
+      - targets: ['backend:9090']

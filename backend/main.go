@@ -134,7 +134,7 @@ func main() {
 		value := price * quantity
 
 		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
-		if value > 100000 {
+		if value > 10 {
 			log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)	
 			broadcast <- trade
 
