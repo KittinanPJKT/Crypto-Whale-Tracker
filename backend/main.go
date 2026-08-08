@@ -61,7 +61,8 @@ func initDB() {
 
 	err = db.Ping()
 	if err != nil {
-		log.Fatalf("ไม่สามารถเชื่อมฐานข้อมูลได้: %v", err)
+		log.Printf("ไม่สามารถเชื่อมฐานข้อมูลได้: %v", err)
+		return
 	}
 
 	log.Println("เชื่อมต่อฐานข้อมูล PostgreSQL สำเร็จ")
@@ -136,7 +137,10 @@ func main() {
 		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
 		if value > 10 {
 			log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)	
+			
+			whalesCaughtTotal.Inc()
 			broadcast <- trade
+
 
 			insertQuery := `INSERT INTO whales (price, quantity, value) VALUES ($1, $2, $3)`
 			_, err = db.Exec(insertQuery, price, quantity, value)
@@ -144,11 +148,11 @@ func main() {
 				log.Printf("บันทึกข้อมูล DB ไม่สำเร็จ : %v", err)
 			} else {
 				log.Println("บันทึกลงฐานข้อมูลเรียบร้อย")
-			}
+			} 
 		}
 
-		log.Println("Go Backend started on :9090")
-    	http.ListenAndServe(":9090", nil)
+		//log.Println("Go Backend started on :9090")
+    	//http.ListenAndServe(":9090", nil)
 
 		
 	}
@@ -200,7 +204,7 @@ func getWhalesHistory(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ดึงประวัติข้อมูลล้มเหลว: %v",err)
 		return
 	}
-	defer rows.Close()
+	defer rows.Close() 
 
 	var whales []WhaleRecord
 	for rows.Next() {
@@ -210,7 +214,7 @@ func getWhalesHistory(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		whales = append(whales, record)
-	}
+	} 
 
 	json.NewEncoder(w).Encode(whales)
 }
