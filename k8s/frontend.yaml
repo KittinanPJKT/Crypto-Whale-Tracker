@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whale-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whale-backend
+  template:
+    metadata:
+      labels:
+        app: whale-backend
+    spec:
+      containers:
+      - name: backend
+        image: crypto-whale-tracker-backend:latest
+        imagePullPolicy: IfNotPresent # ให้ K8s ใช้ Image ในเครื่องเราโดยไม่ต้องโหลดจากเน็ต
+        ports:
+        - containerPort: 9090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: whale-backend
+  ports:
+  - protocol: TCP
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP # ให้ Backend คุยได้แค่ภายใน Cluster
