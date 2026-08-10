@@ -15,7 +15,7 @@ spec:
       containers:
       - name: backend
         image: crypto-whale-tracker-backend:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         env:
         - name: DB_URL
           value: "postgres://root:password@postgres:5432/whale_tracker?sslmode=disable"

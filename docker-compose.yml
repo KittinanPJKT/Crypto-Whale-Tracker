@@ -18,14 +18,23 @@ services:
   backend:
     build: ./backend
     container_name: whale_backend
-    restart: always
     ports:
       - "9090:9090"
-    depends_on:
-      - db
     environment:
-      - DB_URL=postgres://root:password@db:5432/whale_tracker?sslmode=disable
+      - DB_URL=postgres://root:password@postgres:5432/whale_tracker?sslmode=disable
+    depends_on:
+      - postgres
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: whale_postgres
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=whale_tracker
+    ports:
+      - "5432:5432"
+      
 # React frontend
   frontend:
     build: ./frontend
