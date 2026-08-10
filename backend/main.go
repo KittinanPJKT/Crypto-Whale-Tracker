@@ -1,31 +1,40 @@
 package main
 
 import (
-	"log" 
-	"github.com/gorilla/websocket"
-	"strconv"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
+
+	"github.com/gorilla/websocket"
 
 	"database/sql"
+
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
-    "github.com/prometheus/client_golang/prometheus/promauto"
-    "github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Trade struct {
-	Price		string	`json:"p"`
-	Quantity	string	`json:"q"`
+	Price    string `json:"p"`
+	Quantity string `json:"q"`
+	Symbol   string `json:"s"`
+}
+
+type BinanceStream struct {
+	Stream string `json:"stream"`
+	Data   Trade  `json:"data"`
 }
 
 type WhaleRecord struct {
-	ID			int			`json:"id"`
-	Price	 	float64 	`json:"price"`
-	Quantity	float64 	`json:"quantity"`
-	Value 		float64 	`json:"value"`
-	CreatedAt 	string 		`json:"created_at"`
+	ID        int     `json:"id"`
+	Symbol    string  `json:"symbol"`
+	Price     float64 `json:"price"`
+	Quantity  float64 `json:"quantity"`
+	Value     float64 `json:"value"`
+	CreatedAt string  `json:"created_at"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -35,10 +44,10 @@ var upgrader = websocket.Upgrader{
 }
 
 var (
-    whalesCaughtTotal = promauto.NewCounter(prometheus.CounterOpts{
-        Name: "whale_tracker_caught_total",
-        Help: "The total number of whales caught by the tracker",
-    })
+	whalesCaughtTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "whale_tracker_caught_total",
+		Help: "The total number of whales caught by the tracker",
+	})
 )
 
 var clients = make(map[*websocket.Conn]bool)
@@ -70,6 +79,7 @@ func initDB() {
 	createTableQuery := `
 	CREATE TABLE IF NOT EXISTS whales (
 			id SERIAL PRIMARY KEY,
+			symbol VARCHAR(20),
 			price NUMERIC(10, 2),
 			quantity NUMERIC(10, 4),
 			value NUMERIC(15, 2),
@@ -83,7 +93,6 @@ func initDB() {
 
 	log.Println("ตรสจสอบและสร้างตาราง 'whales' เรียบร้อย")
 }
-
 
 func main() {
 
@@ -103,7 +112,7 @@ func main() {
 			log.Fatal("ไม่สามารถเปิดเซิร์ฟเวอร์ได้ : ", err)
 		}
 	}()
-	url := "wss://stream.binance.com/ws/btcusdt@trade"
+	url := "wss://stream.binance.com/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade"
 	log.Printf("กำลังทำการเชื่อมต่อ %s...", url)
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -115,46 +124,45 @@ func main() {
 	log.Println("เชื่อมต่อสำเร็จ! กำลังรอรับข้อมูล...")
 
 	for {
-		_,  message, err := conn.ReadMessage()
+		_, message, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("เกิดข้อผิดพลาดในการอ่านข้อมูล %v", err)
 			break
 		}
 
-		var trade Trade
+		var streamData BinanceStream
 
-		err = json.Unmarshal(message, &trade)
+		err = json.Unmarshal(message, &streamData)
 		if err != nil {
 			log.Printf("แกะ JSON ไม่ออก: %v", err)
 			continue
 		}
 
+		trade := streamData.Data
+
 		price, _ := strconv.ParseFloat(trade.Price, 64)
 		quantity, _ := strconv.ParseFloat(trade.Quantity, 64)
-
 		value := price * quantity
 
 		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
 		if value > 10 {
-			log.Printf("WHALE ALERT! มูลค่า: $%.2f (ราคา: %.2f,จำนวน: %.4f BTC)", value, price, quantity)	
-			
+			log.Printf("WHALE ALERT [%s]! มูลค่า: $%.2f (ราคา: %.2f, จำนวน: %.4f)", trade.Symbol, value, price, quantity)
+
 			whalesCaughtTotal.Inc()
 			broadcast <- trade
 
-
-			insertQuery := `INSERT INTO whales (price, quantity, value) VALUES ($1, $2, $3)`
-			_, err = db.Exec(insertQuery, price, quantity, value)
+			insertQuery := `INSERT INTO whales (symbol, price, quantity, value) VALUES ($1, $2, $3, $4)`
+			_, err = db.Exec(insertQuery, trade.Symbol, price, quantity, value)
 			if err != nil {
 				log.Printf("บันทึกข้อมูล DB ไม่สำเร็จ : %v", err)
 			} else {
 				log.Println("บันทึกลงฐานข้อมูลเรียบร้อย")
-			} 
+			}
 		}
 
 		//log.Println("Go Backend started on :9090")
-    	//http.ListenAndServe(":9090", nil)
+		//http.ListenAndServe(":9090", nil)
 
-		
 	}
 }
 
@@ -198,23 +206,23 @@ func getWhalesHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-type", "application/json")
 
-	rows, err := db.Query("SELECT id, price, quantity, value, created_at FROM whales ORDER BY id DESC LIMIT 50")
+	rows, err := db.Query("SELECT id, symbol, price, quantity, value, created_at FROM whales ORDER BY id DESC LIMIT 50")
 	if err != nil {
 		http.Error(w, "Query failed", http.StatusInternalServerError)
-		log.Printf("ดึงประวัติข้อมูลล้มเหลว: %v",err)
+		log.Printf("ดึงประวัติข้อมูลล้มเหลว: %v", err)
 		return
 	}
-	defer rows.Close() 
+	defer rows.Close()
 
 	var whales []WhaleRecord
 	for rows.Next() {
 		var record WhaleRecord
-		if err := rows.Scan(&record.ID, &record.Price, &record.Quantity, &record.Value, &record.CreatedAt); err != nil {
+		if err := rows.Scan(&record.ID, &record.Symbol, &record.Price, &record.Quantity, &record.Value, &record.CreatedAt); err != nil {
 			log.Printf("แปลงข้อมูลล้มเหลว %v", err)
 			continue
 		}
 		whales = append(whales, record)
-	} 
+	}
 
 	json.NewEncoder(w).Encode(whales)
 }

@@ -1,9 +1,9 @@
 #version: '3.8'
 
 services:
-  db:
+  postgres:
     image: postgres:15-alpine
-    container_name: whale_db
+    container_name: whale_postgres
     restart: always
     environment:
       POSTGRES_USER: root
@@ -18,14 +18,13 @@ services:
   backend:
     build: ./backend
     container_name: whale_backend
-    restart: always
     ports:
       - "9090:9090"
-    depends_on:
-      - db
     environment:
-      - DB_URL=postgres://root:password@db:5432/whale_tracker?sslmode=disable
-
+      - DB_URL=postgres://root:password@postgres:5432/whale_tracker?sslmode=disable
+    depends_on:
+      - postgres
+      
 # React frontend
   frontend:
     build: ./frontend
