@@ -30,6 +30,7 @@ type BinanceStream struct {
 
 type WhaleRecord struct {
 	ID        int     `json:"id"`
+	Symbol    string  `json:"symbol"`
 	Price     float64 `json:"price"`
 	Quantity  float64 `json:"quantity"`
 	Value     float64 `json:"value"`
@@ -78,6 +79,7 @@ func initDB() {
 	createTableQuery := `
 	CREATE TABLE IF NOT EXISTS whales (
 			id SERIAL PRIMARY KEY,
+			symbol VARCHAR(20),
 			price NUMERIC(10, 2),
 			quantity NUMERIC(10, 4),
 			value NUMERIC(15, 2),
@@ -149,8 +151,8 @@ func main() {
 			whalesCaughtTotal.Inc()
 			broadcast <- trade
 
-			insertQuery := `INSERT INTO whales (price, quantity, value) VALUES ($1, $2, $3)`
-			_, err = db.Exec(insertQuery, price, quantity, value)
+			insertQuery := `INSERT INTO whales (symbol, price, quantity, value) VALUES ($1, $2, $3, $4)`
+			_, err = db.Exec(insertQuery, trade.Symbol, price, quantity, value)
 			if err != nil {
 				log.Printf("บันทึกข้อมูล DB ไม่สำเร็จ : %v", err)
 			} else {
@@ -204,7 +206,7 @@ func getWhalesHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-type", "application/json")
 
-	rows, err := db.Query("SELECT id, price, quantity, value, created_at FROM whales ORDER BY id DESC LIMIT 50")
+	rows, err := db.Query("SELECT id, symbol, price, quantity, value, created_at FROM whales ORDER BY id DESC LIMIT 50")
 	if err != nil {
 		http.Error(w, "Query failed", http.StatusInternalServerError)
 		log.Printf("ดึงประวัติข้อมูลล้มเหลว: %v", err)
@@ -215,7 +217,7 @@ func getWhalesHistory(w http.ResponseWriter, r *http.Request) {
 	var whales []WhaleRecord
 	for rows.Next() {
 		var record WhaleRecord
-		if err := rows.Scan(&record.ID, &record.Price, &record.Quantity, &record.Value, &record.CreatedAt); err != nil {
+		if err := rows.Scan(&record.ID, &record.Symbol, &record.Price, &record.Quantity, &record.Value, &record.CreatedAt); err != nil {
 			log.Printf("แปลงข้อมูลล้มเหลว %v", err)
 			continue
 		}
