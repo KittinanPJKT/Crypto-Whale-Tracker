@@ -3,21 +3,26 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 function App() {
   const [whales, setWhales] = useState([])
-  const [minVolume, setMinVolume] = useState(0);
+  const [minVolume, setMinVolume] = useState(0)
+  // 1. เพิ่ม State สำหรับเหรียญที่เลือก (ALL, BTCUSDT, ETHUSDT, SOLUSDT)
+  const [selectedSymbol, setSelectedSymbol] = useState('ALL')
 
+  // 2. กรองข้อมูลตาม MIN VOLUME และ SYMBOL ที่เลือก
   const filteredWhales = whales.filter((whale) => {
-    const value = parseFloat(whale.p) * parseFloat(whale.q);
-    return value >= minVolume;
-  });
+    const value = parseFloat(whale.p) * parseFloat(whale.q)
+    const matchVolume = value >= minVolume
+    const matchSymbol = selectedSymbol === 'ALL' || whale.s === selectedSymbol
+    return matchVolume && matchSymbol
+  })
 
-  const totalWhales = filteredWhales.length;
-  const totalVolume = filteredWhales.reduce((sum, whale) => sum + (parseFloat(whale.p) * parseFloat(whale.q)), 0);
+  const totalWhales = filteredWhales.length
+  const totalVolume = filteredWhales.reduce((sum, whale) => sum + (parseFloat(whale.p) * parseFloat(whale.q)), 0)
   
   const chartData = [...filteredWhales].reverse().map((whale, index) =>({
-    time: index +1,
+    time: index + 1,
     volume: parseFloat(whale.p) * parseFloat(whale.q),
     price: parseFloat(whale.p)
-  }));
+  }))
 
   useEffect(() => {
     fetch('http://localhost:9090/api/whales')
@@ -25,6 +30,7 @@ function App() {
       .then((data) => {
         if (data && data.length > 0) {
           const historyWhales = data.map((record) => ({
+            s: record.symbol || 'BTCUSDT', // อ่านค่า symbol จาก DB (ถ้าไม่มีให้ fallback เป็น BTCUSDT)
             p: record.price.toString(),
             q: record.quantity.toString(),
             isHistory: true
@@ -51,16 +57,22 @@ function App() {
     }
   }, [])
 
-return (
+  // ฟังก์ชันช่วยเหลือสำหรับตัดคำว่า USDT ออกให้ดูสะอาดขึ้น
+  const formatSymbol = (symbol) => {
+    if (!symbol) return 'BTC'
+    return symbol.replace('USDT', '')
+  }
+
+  return (
     /* 1. พื้นหลังหลักสีเข้ม */
     <div className="relative min-h-screen bg-slate-950 p-4 md:p-8 font-sans overflow-hidden">
       
-      {/* 2. ดวงไฟสีๆ พื้นหลัง (เพื่อให้กระจกมีอะไรให้เบลอ) */}
+      {/* 2. ดวงไฟสีๆ พื้นหลัง */}
       <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-600/30 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-600/20 rounded-full blur-[150px] pointer-events-none"></div>
       <div className="fixed top-[40%] left-[30%] w-[800px] h-[400px] bg-indigo-600/20 rounded-full blur-[150px] pointer-events-none"></div>
 
-      {/* 3. คอนเทนต์หลัก (ต้องมี relative และ z-10 เพื่อให้อยู่เหนือแสง) */}
+      {/* 3. คอนเทนต์หลัก */}
       <div className="relative z-10 max-w-5xl mx-auto">
         
         {/* Header Section */}
@@ -69,7 +81,7 @@ return (
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
               Whale Tracker
             </h1>
-            <p className="text-sm text-slate-400 mt-1">Real-time BTC/USDT Transactions</p> 
+            <p className="text-sm text-slate-400 mt-1">Real-time Multi-Coin Transactions (BTC, ETH, SOL)</p> 
           </div>
 
           <div className="flex items-center gap-2 bg-slate-800/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/5 shadow-lg">
@@ -84,7 +96,7 @@ return (
         {/* Stats Summary Section */}
         <div className="bg-slate-800/40 backdrop-blur-xl rounded-2xl p-6 mb-6 border border-white/10 shadow-2xl flex justify-between items-center">
           <div>
-            <p className="text-slate-400 text-sm font-medium mb-1 tracking-wide">TOTAL WHALES CAUGHT</p>
+            <p className="text-slate-400 text-sm font-medium mb-1 tracking-wide">TOTAL WHALES CAUGHT ({selectedSymbol})</p>
             <p className="text-white text-3xl font-bold">{totalWhales} <span className="text-sm text-slate-500 font-normal">TXs</span></p>
           </div>
           <div className="text-right">
@@ -95,17 +107,38 @@ return (
           </div>
         </div>
 
-        {/* Filter Section */}
-        <div className="mb-6 flex items-center justify-end gap-3">
-          <label className="text-slate-400 text-sm font-medium tracking-wide">MIN VOLUME ($):</label>
-          <input 
-            type="number"
-            value={minVolume}
-            onChange={(e) => setMinVolume(Number(e.target.value))}
-            className="bg-slate-900/50 backdrop-blur-md border border-white/10 text-emerald-400 font-mono text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 w-36 shadow-inner outline-none transition-all"
-            placeholder="0"
-            min="0"
+        {/* Filter Section (ปุ่มเลือกเหรียญ + Min Volume) */}
+        <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          
+          {/* ปุ่มสลับเหรียญ Glassmorphic */}
+          <div className="flex bg-slate-900/60 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-lg gap-1">
+            {['ALL', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map((symbol) => (
+              <button
+                key={symbol}
+                onClick={() => setSelectedSymbol(symbol)}
+                className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-300 ${
+                  selectedSymbol === symbol
+                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {symbol === 'ALL' ? '🌐 ALL' : formatSymbol(symbol)}
+              </button>
+            ))}
+          </div>
+
+          {/* Min Volume Input */}
+          <div className="flex items-center gap-3">
+            <label className="text-slate-400 text-sm font-medium tracking-wide">MIN VOLUME ($):</label>
+            <input 
+              type="number"
+              value={minVolume}
+              onChange={(e) => setMinVolume(Number(e.target.value))}
+              className="bg-slate-900/50 backdrop-blur-md border border-white/10 text-emerald-400 font-mono text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 w-36 shadow-inner outline-none transition-all"
+              placeholder="0"
+              min="0"
             />
+          </div>
         </div>
 
         {/* Chart Section */}
@@ -135,13 +168,14 @@ return (
         <div className="space-y-4">
           {filteredWhales.length === 0 ? (
             <div className="bg-slate-800/30 backdrop-blur-md border border-white/5 rounded-2xl p-10 text-center shadow-inner">
-              <p className="text-slate-400 italic">Waiting for whales above ${minVolume}...</p>
+              <p className="text-slate-400 italic">Waiting for whales in {selectedSymbol} above ${minVolume}...</p>
             </div>
           ) : (
             filteredWhales.map((whale, index) => {
               const price = parseFloat(whale.p)
               const qty = parseFloat(whale.q)
               const value = price * qty
+              const symbolText = formatSymbol(whale.s)
 
               return (
                 <div
@@ -153,11 +187,17 @@ return (
                   }`}
                 >
                   <div>
-                    <p className='font-mono text-xl font-bold text-slate-100'>
-                      ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}  
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1 font-medium tracking-wide">
-                      AMOUNT: <span className="text-emerald-400/80">{qty.toFixed(4)} BTC</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      {/* แท็กแสดงชื่อเหรียญ */}
+                      <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-500/20 font-mono">
+                        {symbolText}
+                      </span>
+                      <p className='font-mono text-xl font-bold text-slate-100 inline-block'>
+                        ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2})}  
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-400 font-medium tracking-wide">
+                      AMOUNT: <span className="text-emerald-400/80">{qty.toFixed(4)} {symbolText}</span>
                     </p>
                   </div>
 
