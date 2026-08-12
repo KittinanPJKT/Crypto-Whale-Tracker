@@ -145,7 +145,7 @@ func main() {
 		value := price * quantity
 
 		// สามารถทดสอบเปลี่ยนค่าเป็น 5000 เพื่อทดสอบการทำงานของโปรแกรม
-		if value > 10 {
+		if value > 10000 {
 			log.Printf("WHALE ALERT [%s]! มูลค่า: $%.2f (ราคา: %.2f, จำนวน: %.4f)", trade.Symbol, value, price, quantity)
 
 			whalesCaughtTotal.Inc()
