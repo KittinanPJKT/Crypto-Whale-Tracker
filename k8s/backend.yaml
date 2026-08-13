@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
       - name: backend
-        image: crypto-whale-tracker-backend:latest
-        imagePullPolicy: Never
+        image: crypto-whale-tracker-backend:v3
+        imagePullPolicy: IfNotPresent
         env:
         - name: DB_URL
           value: "postgres://root:password@postgres:5432/whale_tracker?sslmode=disable"
@@ -27,10 +27,10 @@ kind: Service
 metadata:
   name: backend
 spec:
+  type: NodePort
   selector:
     app: whale-backend
   ports:
-  - protocol: TCP
-    port: 9090
+  - port: 9090
     targetPort: 9090
-  type: ClusterIP
+    nodePort: 30090
