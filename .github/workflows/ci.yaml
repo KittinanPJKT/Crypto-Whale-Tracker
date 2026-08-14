@@ -22,7 +22,7 @@ jobs:
       working-directory: ./backend
       run: go build -v ./...
 
-  # Job 2: ทดสอบฝั่ง Frontend (React/Vite)
+ # Job 2: ทดสอบฝั่ง Frontend (React/Vite)
   build-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +32,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20' # <--- เปลี่ยนตรงนี้เป็น 20
 
     - name: Install dependencies
       working-directory: ./frontend
