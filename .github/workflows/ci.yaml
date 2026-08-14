@@ -1,0 +1,43 @@
+name: Crypto Whale Tracker CI
+
+# กำหนดให้ Pipeline ทำงานเมื่อมีการ Push โค้ดเข้ามาที่ branch main หรือ feature/*
+on:
+  push:
+    branches: [ "main", "feature/*" ]
+
+jobs:
+  # Job 1: ทดสอบฝั่ง Backend (Go)
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21' # ใช้ Go เวอร์ชันล่าสุด
+
+    - name: Build Go Backend
+      working-directory: ./backend
+      run: go build -v ./...
+
+ # Job 2: ทดสอบฝั่ง Frontend (React/Vite)
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' # <--- เปลี่ยนตรงนี้เป็น 20
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm install
+
+    - name: Build React Frontend
+      working-directory: ./frontend
+      run: npm run build
