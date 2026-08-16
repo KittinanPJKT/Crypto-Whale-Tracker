@@ -212,8 +212,43 @@ function App() {
             })
           )}
         </div>
-
       </div>
+      {/* --- เริ่มโค้ด Footer ที่เพิ่มใหม่ --- */}
+        <footer className="mt-16 mb-8 border-t border-white/10 pt-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
+            
+            {/* 1. เลเจนด์อธิบายข้อมูล */}
+            <div className="space-y-3">
+              <h3 className="text-emerald-400 font-semibold tracking-widest text-xs">DATA LEGEND</h3>
+              <ul className="text-slate-400 space-y-2 text-xs md:text-sm">
+                <li><span className="text-slate-300 font-medium">Whale (ปลาวาฬ):</span> ธุรกรรมการซื้อขายที่มีปริมาณมหาศาลผิดปกติ</li>
+                <li><span className="text-slate-300 font-medium">Min Volume:</span> ตัวกรองมูลค่าขั้นต่ำ (USD) เพื่อคัดกรองเฉพาะไม้ใหญ่</li>
+                <li><span className="text-slate-300 font-medium">Live Trend:</span> กราฟแสดงปริมาณการเทรดแบบเรียลไทม์ (50 ธุรกรรมล่าสุด)</li>
+              </ul>
+            </div>
+
+            {/* 2. ข้อสงวนสิทธิ์ (สำคัญมาก) */}
+            <div className="space-y-3">
+              <h3 className="text-emerald-400 font-semibold tracking-widest text-xs">DISCLAIMER</h3>
+              <p className="text-slate-400 leading-relaxed text-xs md:text-sm">
+                ข้อมูลทั้งหมดบนเว็บไซต์นี้ดึงมาจาก Binance WebSocket แบบเรียลไทม์ 
+                <span className="text-amber-400/80"> จัดทำขึ้นเพื่อการศึกษาและการทดสอบระบบเท่านั้น ไม่ใช่คำแนะนำทางการเงินหรือการลงทุน (Not Financial Advice)</span>
+              </p>
+            </div>
+
+            {/* 3. เครดิตลิขสิทธิ์ / Tech Stack */}
+            <div className="space-y-3 md:text-right">
+              <h3 className="text-emerald-400 font-semibold tracking-widest text-xs">SYSTEM & CREDITS</h3>
+              <p className="text-slate-400 text-xs md:text-sm">Powered by React, Go, and PostgreSQL</p>
+              <div className="pt-2 text-[11px] text-slate-500 font-mono space-y-1">
+                <p>© 2026 Kittinan Patjaikotha.</p>
+                <p>Computer Engineering, Suranaree University of Technology</p>
+              </div>
+            </div>
+
+          </div>
+        </footer>
+        {/* --- สิ้นสุดโค้ด Footer --- */}
     </div>
   )
 }
