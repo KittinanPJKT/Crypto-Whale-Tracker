@@ -45,3 +45,19 @@ jobs:
         context: ./frontend
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/crypto-whale-tracker-frontend:latest
+
+    # Job 3: Auto Deploy ลง Kubernetes ในเครื่อง
+  deploy-to-local-k8s:
+    needs: [build-and-push-backend, build-and-push-frontend] # ต้องรอให้ Job 1 และ 2 ดัน Image เสร็จก่อน
+    runs-on: self-hosted # <--- จุดสำคัญ! สั่งให้วิ่งมาทำงานที่เครื่องของคุณ
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Apply Kubernetes Manifests
+      run: kubectl apply -f k8s/
+
+    - name: Rollout Restart Deployments (Force Update Image)
+      run: |
+        kubectl rollout restart deployment whale-backend
+        kubectl rollout restart deployment whale-frontend
