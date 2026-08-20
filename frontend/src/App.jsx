@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid} from 'recharts'
+import { 
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell, Legend 
+} from 'recharts'
 
 function App() {
   const [whales, setWhales] = useState([])
@@ -49,11 +52,59 @@ function App() {
   const totalWhales = filteredWhales.length
   const totalVolume = filteredWhales.reduce((sum, whale) => sum + (parseFloat(whale.p) * parseFloat(whale.q)), 0)
   
+  // 📊 เตรียมข้อมูลสำหรับ Line Chart
   const chartData = [...filteredWhales].reverse().map((whale, index) =>({
     time: index + 1,
     volume: parseFloat(whale.p) * parseFloat(whale.q),
     price: parseFloat(whale.p)
   }))
+
+  const formatSymbol = (symbol) => {
+    if (!symbol) return 'BTC'
+    return symbol.replace('USDT', '')
+  }
+
+  // 🍩 เตรียมข้อมูลสำหรับ Pie Chart (สรุป Volume ตามเหรียญ)
+  const getPieData = () => {
+    const totals = {}
+    filteredWhales.forEach(w => {
+      const sym = formatSymbol(w.s)
+      const vol = parseFloat(w.p) * parseFloat(w.q)
+      totals[sym] = (totals[sym] || 0) + vol
+    })
+    return Object.keys(totals).map(key => ({
+      name: key,
+      value: totals[key]
+    })).sort((a, b) => b.value - a.value) // เรียงจากมากไปน้อย
+  }
+  const pieData = getPieData()
+  const PIE_COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b'] // สีเขียว, ฟ้า, ม่วง, ส้ม
+
+  // 💾 ฟังก์ชันสำหรับ Export ข้อมูลเป็น CSV
+  const exportToCSV = () => {
+    if (filteredWhales.length === 0) return
+
+    const headers = ['Timestamp,Symbol,Price(USD),Amount,Volume(USD),Type']
+    const rows = filteredWhales.map(w => {
+      const sym = formatSymbol(w.s)
+      const p = parseFloat(w.p).toFixed(2)
+      const q = parseFloat(w.q).toFixed(4)
+      const vol = (parseFloat(w.p) * parseFloat(w.q)).toFixed(2)
+      const type = w.isHistory ? 'History' : 'Live'
+      return `${w.timestamp},${sym},${p},${q},${vol},${type}`
+    })
+
+    const csvContent = headers.concat(rows).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `whale_tracker_${new Date().getTime()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   useEffect(() => {
     fetch('http://localhost:9090/api/whales')
@@ -65,7 +116,6 @@ function App() {
             p: record.price.toString(),
             q: record.quantity.toString(),
             isHistory: true,
-            // เพิ่มการอ่านเวลาประวัติเก่า (ถ้าหลังบ้านส่งมา ถ้าไม่มีให้ขึ้นว่า History)
             timestamp: record.created_at ? new Date(record.created_at).toLocaleTimeString('th-TH', { hour12: false }) : 'Historical'
           }))
           setWhales(historyWhales)
@@ -80,8 +130,6 @@ function App() {
     ws.onmessage = (event) => {
       const trade = JSON.parse(event.data)
       trade.isHistory = false
-      
-      // 🌟 สร้างเวลาประทับ (Timestamp) ณ วินาทีที่ข้อมูลวิ่งเข้ามา
       trade.timestamp = new Date().toLocaleTimeString('th-TH', { hour12: false })
       
       const tradeValue = parseFloat(trade.p) * parseFloat(trade.q)
@@ -95,17 +143,12 @@ function App() {
 
       setWhales((prevWhales) => {
         if (isPausedRef.current) return prevWhales
-        return [trade, ...prevWhales].slice(0, 50)
+        return [trade, ...prevWhales].slice(0, 50) // โชว์ 50 รายการล่าสุด
       })
     }
 
     return () => ws.close()
   }, [])
-
-  const formatSymbol = (symbol) => {
-    if (!symbol) return 'BTC'
-    return symbol.replace('USDT', '')
-  }
 
   return (
     <div className="relative min-h-screen bg-slate-950 p-4 md:p-8 font-sans overflow-hidden">
@@ -130,10 +173,10 @@ function App() {
       <div className="fixed bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-600/20 rounded-full blur-[150px] pointer-events-none"></div>
       <div className="fixed top-[40%] left-[30%] w-[800px] h-[400px] bg-indigo-600/20 rounded-full blur-[150px] pointer-events-none"></div>
 
-      <div className="relative z-10 max-w-5xl mx-auto">
+      <div className="relative z-10 max-w-6xl mx-auto">
         
         {/* Header */}
-        <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/10 pb-4 gap-4">
           <div>
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
               Whale Tracker
@@ -141,31 +184,42 @@ function App() {
             <p className="text-sm text-slate-400 mt-1">Real-time Multi-Coin Transactions (BTC, ETH, SOL)</p> 
           </div>
 
-          <button 
-            onClick={() => setIsPaused(!isPaused)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full border shadow-lg transition-all duration-300 ${
-              isPaused 
-                ? 'bg-amber-500/10 border-amber-500/50 hover:bg-amber-500/20' 
-                : 'bg-slate-800/40 backdrop-blur-md border-white/5 hover:bg-slate-700/50'
-            }`}
-          >
-            {!isPaused ? (
-              <>
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                </span>
-                <span className="text-emerald-400 font-mono text-sm tracking-wide">Live Stream</span>
-              </>
-            ) : (
-              <>
-                <span className="relative flex h-3 w-3">
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                </span>
-                <span className="text-amber-400 font-mono text-sm tracking-wide">Paused</span>
-              </>
-            )}
-          </button>    
+          <div className="flex items-center gap-3">
+            {/* 🌟 ปุ่ม Export CSV */}
+            <button 
+              onClick={exportToCSV}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/40 backdrop-blur-md border border-white/10 hover:bg-slate-700/50 hover:border-emerald-500/50 transition-all text-slate-200 text-sm font-medium shadow-lg"
+            >
+              <span>⬇️</span> Export CSV
+            </button>
+
+            {/* ปุ่ม Pause/Live */}
+            <button 
+              onClick={() => setIsPaused(!isPaused)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border shadow-lg transition-all duration-300 ${
+                isPaused 
+                  ? 'bg-amber-500/10 border-amber-500/50 hover:bg-amber-500/20' 
+                  : 'bg-slate-800/40 backdrop-blur-md border-white/5 hover:bg-slate-700/50'
+              }`}
+            >
+              {!isPaused ? (
+                <>
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-emerald-400 font-mono text-sm tracking-wide">Live Stream</span>
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-3 w-3">
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                  </span>
+                  <span className="text-amber-400 font-mono text-sm tracking-wide">Paused</span>
+                </>
+              )}
+            </button> 
+          </div>   
         </div>
 
         {/* Stats Summary */}
@@ -184,7 +238,7 @@ function App() {
 
         {/* Filter Section */}
         <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex bg-slate-900/60 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-lg gap-1">
+          <div className="flex bg-slate-900/60 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-lg gap-1 flex-wrap">
             {['ALL', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map((symbol) => (
               <button
                 key={symbol}
@@ -200,8 +254,8 @@ function App() {
             ))}
           </div>
 
-          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6 w-full md:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
               <label className="text-amber-400 text-sm font-medium tracking-wide">BACKEND FILTER ($):</label>
               <input 
                 type="number"
@@ -212,7 +266,7 @@ function App() {
                 step="10000"
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
               <label className="text-slate-400 text-sm font-medium tracking-wide">MIN VOLUME ($):</label>
               <input 
                 type="number"
@@ -226,26 +280,61 @@ function App() {
           </div>
         </div>
 
-        {/* Chart */}
+        {/* 📈 Chart Dashboard Section */}
         {filteredWhales.length > 0 && (
-          <div className="bg-slate-800/40 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-2xl mb-8 h-80">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-emerald-400/90 font-semibold text-sm tracking-widest">REAL-TIME VOLUME TREND ($)</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 h-auto lg:h-[350px]">
+            
+            {/* 1. Line Chart (คอลัมน์กว้าง 2 ส่วน) */}
+            <div className="lg:col-span-2 bg-slate-800/40 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-2xl h-80 lg:h-full">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-emerald-400/90 font-semibold text-sm tracking-widest">REAL-TIME VOLUME TREND ($)</h2>
+              </div>
+              <ResponsiveContainer width="100%" height="85%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff1a" vertical={false} />
+                  <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={80} tickFormatter={(value) => `$${value.toLocaleString()}`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#f8fafc', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
+                    itemStyle={{ color: '#34d399', fontWeight: 'bold' }}
+                    formatter={(value) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Volume']}
+                    labelStyle={{ display: 'none' }}
+                  />
+                  <Line type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#022c22' }} activeDot={{ r: 7, strokeWidth: 0 }} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height="85%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff1a" vertical={false} />
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={80} tickFormatter={(value) => `$${value.toLocaleString()}`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#f8fafc', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
-                  itemStyle={{ color: '#34d399', fontWeight: 'bold' }}
-                  formatter={(value) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, 'Volume']}
-                  labelStyle={{ display: 'none' }}
-                />
-                <Line type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#022c22' }} activeDot={{ r: 7, strokeWidth: 0 }} />
-              </LineChart>
-            </ResponsiveContainer>
+
+            {/* 2. Pie Chart (คอลัมน์กว้าง 1 ส่วน) */}
+            <div className="lg:col-span-1 bg-slate-800/40 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-2xl h-80 lg:h-full flex flex-col">
+              <h2 className="text-emerald-400/90 font-semibold text-sm tracking-widest mb-2">VOLUME DISTRIBUTION</h2>
+              <div className="flex-grow">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, 'Total Volume']}
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '0.5rem', color: '#f8fafc' }}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#cbd5e1' }}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -277,7 +366,6 @@ function App() {
                         {symbolText}
                       </span>
                       
-                      {/* 🌟 แสดงเวลาตรงนี้ 🌟 */}
                       <span className="text-slate-400 bg-slate-900/50 px-2 py-0.5 rounded-md text-[10px] font-mono border border-white/5">
                         🕒 {whale.timestamp}
                       </span>
@@ -305,7 +393,6 @@ function App() {
 
         {/* Footer */}
         <footer className="mt-16 mb-8 border-t border-white/10 pt-8">
-          {/* ... (โค้ด Footer เหมือนเดิม) ... */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
             <div className="space-y-3">
               <h3 className="text-emerald-400 font-semibold tracking-widest text-xs">DATA LEGEND</h3>
