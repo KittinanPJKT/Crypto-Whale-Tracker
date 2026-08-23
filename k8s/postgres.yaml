@@ -14,7 +14,6 @@ kind: Deployment
 metadata:
   name: whale-db
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: whale-db
@@ -25,16 +24,16 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: postgres:15-alpine
-        ports:
-        - containerPort: 5432
+        image: postgres:15
         env:
         - name: POSTGRES_USER
-          value: "root"
+          value: "whaleuser"
         - name: POSTGRES_PASSWORD
-          value: "password"
+          value: "whalepassword"
         - name: POSTGRES_DB
-          value: "whale_tracker"
+          value: "whaledb"
+        ports:
+        - containerPort: 5432
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
@@ -42,14 +41,3 @@ spec:
       - name: postgres-storage
         persistentVolumeClaim:
           claimName: postgres-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres
-spec:
-  selector:
-    app: whale-db
-  ports:
-  - port: 5432
-    targetPort: 5432
